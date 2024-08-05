@@ -10,11 +10,11 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors())
 
+
+// Static
 app.use(express.static(path.join(__dirname, './dist')));
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, './dist', 'index.html'));
-});
+
 
 const searchStrings = [
   '_Incapsula_Resource',
@@ -38,10 +38,6 @@ function CheckGoogleAnalytics(fileContent){
   return checker;
 }
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
-
 // Checking HTTP or HTTPS
 async function checkProtocol(url) {
   try {
@@ -59,11 +55,13 @@ async function checkProtocol(url) {
   }
 }
 
-app.post('/test', (req, res) => {
+// API Endpoints
+
+app.post('/api/test', (req, res) => {
   res.send('endpoints working');
 })
 
-app.post('/check', async (req, res) => {
+app.post('/api/check', async (req, res) => {
   const target_url = req.body.target;
 
   const protocol = await checkProtocol(target_url);
