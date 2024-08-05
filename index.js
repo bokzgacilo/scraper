@@ -59,6 +59,10 @@ async function checkProtocol(url) {
   }
 }
 
+app.post('/test', (req, res) => {
+  res.send('endpoints working');
+})
+
 app.post('/check', async (req, res) => {
   const target_url = req.body.target;
 
