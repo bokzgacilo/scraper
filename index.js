@@ -10,10 +10,10 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors())
 
-app.use(express.static(path.join(__dirname, '/dist')));
+app.use(express.static(path.join(__dirname, './dist')));
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '/dist', 'index.html'));
+  res.sendFile(path.join(__dirname, './dist', 'index.html'));
 });
 
 const searchStrings = [
@@ -69,7 +69,7 @@ app.post('/check', async (req, res) => {
   } else {
     try {
       const response = await axios.get(`${protocol}://${target_url}`);
-      const filePath = path.join(__dirname, 'temp/page_source.txt');
+      const filePath = path.join(__dirname, './temp/page_source.txt');
       fs.writeFileSync(filePath, response.data, 'utf8');
       const fileContent = fs.readFileSync(filePath, 'utf8');
 
