@@ -55,11 +55,16 @@ async function checkProtocol(url) {
   }
 }
 
-app.post('/test', (req, res) => {
+app.get('/temp/*', (req, res) => {
+  const filePath = path.join(__dirname, 'temp', req.params[0]);
+  res.sendFile(filePath);
+});
+
+app.get('/api/test', (req, res) => {
   res.send('endpoints working');
 })
 
-app.post('/check', async (req, res) => {
+app.post('/api/check', async (req, res) => {
   const target_url = req.body.target;
 
   const protocol = await checkProtocol(target_url);
@@ -69,7 +74,7 @@ app.post('/check', async (req, res) => {
   } else {
     try {
       const response = await axios.get(`${protocol}://${target_url}`);
-      const filePath = path.join(__dirname, './temp/page_source.txt');
+      const filePath = path.join(__dirname, '/temp/page_source.txt');
       fs.writeFileSync(filePath, response.data, 'utf8');
       const fileContent = fs.readFileSync(filePath, 'utf8');
 
