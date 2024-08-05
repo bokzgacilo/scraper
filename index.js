@@ -10,7 +10,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors())
 
-// app.use(express.static(path.join(__dirname, './dist')));
+app.use('/temp', express.static(path.join(__dirname, 'temp')));
 
 const searchStrings = [
   '_Incapsula_Resource',
@@ -33,10 +33,6 @@ function CheckGoogleAnalytics(fileContent){
   let checker = ganalytics.some(word => fileContent.includes(word));
   return checker;
 }
-
-// app.get('/', (req, res) => {
-//   res.sendFile(path.join(__dirname, './dist', 'index.html'));
-// })
 
 // Checking HTTP or HTTPS
 async function checkProtocol(url) {
@@ -74,7 +70,7 @@ app.post('/api/check', async (req, res) => {
   } else {
     try {
       const response = await axios.get(`${protocol}://${target_url}`);
-      const filePath = path.join(__dirname, '/temp/page_source.txt');
+      const filePath = 'https://scraper-inky.vercel.app/temp/page_source.txt';
       fs.writeFileSync(filePath, response.data, 'utf8');
       const fileContent = fs.readFileSync(filePath, 'utf8');
 
@@ -86,7 +82,6 @@ app.post('/api/check', async (req, res) => {
         } else {
           acc[index] = fileContent.includes(str);
         }
-
         return acc;
       }, {});
 
