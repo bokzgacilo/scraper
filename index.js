@@ -73,9 +73,7 @@ app.post('/api/excel', (req, res) => {
       worksheet[findingCellAddress] = {
         v: finding ? 'True' : 'False',
         s: {
-          fill: {
-            fgColor: { rgb: finding ? '00FF00' : 'FF0000' }
-          }
+        
         }
       };
     });
