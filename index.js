@@ -71,7 +71,7 @@ app.post('/api/excel', (req, res) => {
     item.findings.forEach((finding, colIndex) => {
       const findingCellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex + 1 });
       worksheet[findingCellAddress] = {
-        v: finding ? 'True' : 'False',
+        v: finding ? 'x' : '',
         s: {
         
         }
