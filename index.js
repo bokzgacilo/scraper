@@ -3,13 +3,12 @@ const app = express()
 const bodyParser = require('body-parser');
 const cors = require('cors')
 const axios = require('axios')
-const fs = require('fs')
 const path = require('path')
+const XLSX = require('xlsx-style')
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors())
-
 app.use('/', express.static(path.join(__dirname, 'dist')));
 
 const searchStrings = [
@@ -51,6 +50,52 @@ async function checkProtocol(url) {
   }
 }
 
+app.post('/api/excel', (req, res) => {
+  let json_data = req.body.excel;
+  
+  const workbook = { SheetNames: ['Sheet1'], Sheets: { Sheet1: {} } };
+  const worksheet = workbook.Sheets['Sheet1'];
+  const headers = ["Target", "Robots", "Wordpress", "Shopify", "Facebook Pixel", "Google Analytics", "Klaviyo", "Using PHP"];
+  headers.forEach((header, colIndex) => {
+    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIndex });
+    worksheet[cellAddress] = { v: header, s: { font: { bold: true } } };
+  });
+
+  json_data.forEach((item, rowIndex) => {
+    const row = rowIndex + 1;
+  
+    const targetCell = XLSX.utils.encode_cell({ r: row, c: 0 });
+    worksheet[targetCell] = { v: item.target };
+  
+    // Findings
+    item.findings.forEach((finding, colIndex) => {
+      const findingCellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex + 1 });
+      worksheet[findingCellAddress] = {
+        v: finding ? 'True' : 'False',
+        s: {
+          fill: {
+            fgColor: { rgb: finding ? '00FF00' : 'FF0000' }
+          }
+        }
+      };
+    });
+  });
+
+  // Define the worksheet range
+  worksheet['!ref'] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: json_data.length, c: headers.length - 1 }
+  });
+
+  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+  // Set headers and send the buffer as a downloadable file
+  res.setHeader('Content-Disposition', 'attachment; filename=Exported_Results.xlsx');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  
+  res.send(buffer);
+})
+
 app.get('/temp/*', (req, res) => {
   const filePath = path.join(__dirname, 'temp', req.params[0]);
   res.sendFile(filePath);
@@ -69,24 +114,33 @@ app.post('/api/check', async (req, res) => {
     res.status(404).send('404');
   } else {
     try {
-      const response = await axios.get(`${protocol}://${target_url}`);
-
-      let results = searchStrings.reduce((acc, str, index) => {
-        if(str === 1){
-          acc[1] = CheckWordpress(response.data)
-        }else if(str === 4){
-          acc[4] = CheckGoogleAnalytics(response.data)
-        } else {
-          acc[index] = response.data.includes(str);
-        }
-        return acc;
-      }, {});
+      const response = await fetch(`${protocol}://${target_url}`);
       
-      console.log(`${target_url} done.`)
-      res.send(results)
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.text();
+
+      const tempfindings = searchStrings.map(str => {
+        if (str === 1) {
+          return CheckWordpress(data);
+        } else if (str === 4) {
+          return CheckGoogleAnalytics(data);
+        } else {
+          return data.includes(str);
+        }
+      });
+
+      let tempjson = {
+        target: target_url,
+        findings: tempfindings
+      };
+
+      res.send(tempjson);
     } catch (error) {
-      console.error('Error fetching the website:', error);
-      res.status(500).send('Error fetching the website');
+      console.error('Error fetching data:', error);
+      res.status(500).send({ error: 'Internal Server Error' });
     }
   }
 });
