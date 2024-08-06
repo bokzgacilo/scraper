@@ -5,18 +5,12 @@ const cors = require('cors')
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
-const { createClient } = require('@supabase/supabase-js');
-
-// Replace with your Supabase URL and API Key
-const supabaseUrl = 'https://uisdawrhjqvaxghevdbf.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpc2Rhd3JoanF2YXhnaGV2ZGJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg2NzcxMjEsImV4cCI6MjAzNDI1MzEyMX0.u142JAUJOp2qja7haCmilVMmTWVz0-8NeQ0pM1FG73I';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors())
 
-app.use('/temp', express.static(path.join(__dirname, 'temp')));
+app.use('/', express.static(path.join(__dirname, 'dist')));
 
 const searchStrings = [
   '_Incapsula_Resource',
@@ -75,40 +69,43 @@ app.post('/api/check', async (req, res) => {
     res.status(404).send('404');
   } else {
     try {
+      let filePath = path.join(
+        require('os').homedir(),
+        'Desktop',
+        'page_source.txt'
+      );
+
       const response = await axios.get(`${protocol}://${target_url}`);
 
-      // UPDATING TEXT
-      try {
-        const { error } = await supabase.storage.from('temp').upload('public/file.txt', Buffer.from(response.data, 'utf-8'), {
-          contentType: 'text/plain',
-          upsert: true // Ensure the file is overwritten if it exists
-        });
-      }catch(error){
-        console.log('Error reading file: ' + error.message);
-      }
+      fs.writeFile(filePath, response.data, 'utf8', (err) => {
+        if (err) {
+          console.error('Error writing file:', err);
+          return;
+        }
 
-      // Reading TEXT
-      try {
-        let {data, error} = await supabase.storage.from('temp').download('public/file.txt');
-        if(error) throw error;
-    
-        let content = await data.text();
-
-        let results = searchStrings.reduce((acc, str, index) => {
-          if(str === 1){
-            acc[1] = CheckWordpress(content)
-          }else if(str === 4){
-            acc[4] = CheckGoogleAnalytics(content)
-          } else {
-            acc[index] = content.includes(str);
+        // SUCCESS WRITING ON TEXT FILE
+        fs.readFile(filePath, 'utf-8', (err, data) => {
+          if(err){
+            console.error('Error reading file ' , err)
+            return
           }
-          return acc;
-        }, {});
-        
-        res.send(results)
-      }catch(error){
-        console.log('Error reading file: ' + error.message);
-      }
+          
+          // SUCCESS READING TEXT FILE
+          let results = searchStrings.reduce((acc, str, index) => {
+            if(str === 1){
+              acc[1] = CheckWordpress(data)
+            }else if(str === 4){
+              acc[4] = CheckGoogleAnalytics(data)
+            } else {
+              acc[index] = data.includes(str);
+            }
+            return acc;
+          }, {});
+          
+          res.send(results)
+          console.log(`${target_url} done.`)
+        })
+      });
     } catch (error) {
       console.error('Error fetching the website:', error);
       res.status(500).send('Error fetching the website');
