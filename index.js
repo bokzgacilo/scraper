@@ -69,43 +69,21 @@ app.post('/api/check', async (req, res) => {
     res.status(404).send('404');
   } else {
     try {
-      let filePath = path.join(
-        require('os').homedir(),
-        'Desktop',
-        'page_source.txt'
-      );
-
       const response = await axios.get(`${protocol}://${target_url}`);
 
-      fs.writeFile(filePath, response.data, 'utf8', (err) => {
-        if (err) {
-          console.error('Error writing file:', err);
-          return;
+      let results = searchStrings.reduce((acc, str, index) => {
+        if(str === 1){
+          acc[1] = CheckWordpress(response.data)
+        }else if(str === 4){
+          acc[4] = CheckGoogleAnalytics(response.data)
+        } else {
+          acc[index] = response.data.includes(str);
         }
-
-        // SUCCESS WRITING ON TEXT FILE
-        fs.readFile(filePath, 'utf-8', (err, data) => {
-          if(err){
-            console.error('Error reading file ' , err)
-            return
-          }
-          
-          // SUCCESS READING TEXT FILE
-          let results = searchStrings.reduce((acc, str, index) => {
-            if(str === 1){
-              acc[1] = CheckWordpress(data)
-            }else if(str === 4){
-              acc[4] = CheckGoogleAnalytics(data)
-            } else {
-              acc[index] = data.includes(str);
-            }
-            return acc;
-          }, {});
-          
-          res.send(results)
-          console.log(`${target_url} done.`)
-        })
-      });
+        return acc;
+      }, {});
+      
+      console.log(`${target_url} done.`)
+      res.send(results)
     } catch (error) {
       console.error('Error fetching the website:', error);
       res.status(500).send('Error fetching the website');
