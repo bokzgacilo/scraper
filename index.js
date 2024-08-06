@@ -5,6 +5,12 @@ const cors = require('cors')
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
+const { createClient } = require('@supabase/supabase-js');
+
+// Replace with your Supabase URL and API Key
+const supabaseUrl = 'https://uisdawrhjqvaxghevdbf.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpc2Rhd3JoanF2YXhnaGV2ZGJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg2NzcxMjEsImV4cCI6MjAzNDI1MzEyMX0.u142JAUJOp2qja7haCmilVMmTWVz0-8NeQ0pM1FG73I';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -70,22 +76,39 @@ app.post('/api/check', async (req, res) => {
   } else {
     try {
       const response = await axios.get(`${protocol}://${target_url}`);
-      const filePath = 'https://scraper-inky.vercel.app/temp/page_source.txt';
-      fs.writeFileSync(filePath, response.data, 'utf8');
-      const fileContent = fs.readFileSync(filePath, 'utf8');
 
-      const results = searchStrings.reduce((acc, str, index) => {
-        if(str === 1){
-          acc[1] = CheckWordpress(fileContent)
-        }else if(str === 4){
-          acc[4] = CheckGoogleAnalytics(fileContent)
-        } else {
-          acc[index] = fileContent.includes(str);
-        }
-        return acc;
-      }, {});
+      // UPDATING TEXT
+      try {
+        const { error } = await supabase.storage.from('temp').upload('public/file.txt', Buffer.from(response.data, 'utf-8'), {
+          contentType: 'text/plain',
+          upsert: true // Ensure the file is overwritten if it exists
+        });
+      }catch(error){
+        console.log('Error reading file: ' + error.message);
+      }
 
-      res.send(results);
+      // Reading TEXT
+      try {
+        let {data, error} = await supabase.storage.from('temp').download('public/file.txt');
+        if(error) throw error;
+    
+        let content = await data.text();
+
+        let results = searchStrings.reduce((acc, str, index) => {
+          if(str === 1){
+            acc[1] = CheckWordpress(content)
+          }else if(str === 4){
+            acc[4] = CheckGoogleAnalytics(content)
+          } else {
+            acc[index] = content.includes(str);
+          }
+          return acc;
+        }, {});
+        
+        res.send(results)
+      }catch(error){
+        console.log('Error reading file: ' + error.message);
+      }
     } catch (error) {
       console.error('Error fetching the website:', error);
       res.status(500).send('Error fetching the website');
