@@ -12,42 +12,38 @@ app.use(cors())
 app.use('/', express.static(path.join(__dirname, 'dist')));
 
 const searchStrings = [
-  '_Incapsula_Resource',
-  1,
-  'cdn.shopify.com',
-  "fbq('track'",
-  4,
-  'static.klaviyo.com',
-  '.php'
+  'wp-content',
+  'wp-admin',
+  'wp-json',
+  'wp-json/wp/v2/',
+  'react',
+  'angular',
+  'vue',
+  'helmet'
 ];
 
-function CheckWordpress(fileContent){
-  let wpress = ['wp-admin', 'wp-content', 'wp-asset', 'wp-includes']
+function ReactChecker(fileContent){
+  let wpress = ['_next', 'data-reactroot', 'data-reactid']
+  // let wpress = ['.php']  
   let checker = wpress.some(word => fileContent.includes(word));
-  return checker;
-}
-
-function CheckGoogleAnalytics(fileContent){
-  let ganalytics = ['www.googletagmanager.com', 'analytics_googleanalytics', 'google_analytics']
-  let checker = ganalytics.some(word => fileContent.includes(word));
   return checker;
 }
 
 // Checking HTTP or HTTPS
 async function checkProtocol(url) {
-  try {
-    const httpsUrl = `https://${url}`;
-    await axios.get(httpsUrl);
-    return 'https';
-  } catch (httpsError) {
-    try {
-      const httpUrl = `http://${url}`;
-      await axios.get(httpUrl);
-      return 'http';
-    } catch (httpError) {
-      return 'unknown';
-    }
-  }
+  // try {
+  //   const httpsUrl = `https://${url}`;
+  //   await axios.get(httpsUrl);
+  //   return 'https';
+  // } catch (httpsError) {
+  //   try {
+  //     const httpUrl = `http://${url}`;
+  //     await axios.get(httpUrl);
+  //     return 'http';
+  //   } catch (httpError) {
+  //     return 'unknown';
+  //   }
+  // }
 }
 
 app.post('/api/excel', (req, res) => {
@@ -55,7 +51,7 @@ app.post('/api/excel', (req, res) => {
   
   const workbook = { SheetNames: ['Sheet1'], Sheets: { Sheet1: {} } };
   const worksheet = workbook.Sheets['Sheet1'];
-  const headers = ["Target", "Robots", "Wordpress", "Shopify", "Facebook Pixel", "Google Analytics", "Klaviyo", "Using PHP"];
+  const headers = ["Target", "wp-content", "wp-admin", "wp-json", "wp-json/wp/v2/", "react", "angular", "vue", "helmet"];
   headers.forEach((header, colIndex) => {
     const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIndex });
     worksheet[cellAddress] = { v: header, s: { font: { bold: true } } };
@@ -72,9 +68,7 @@ app.post('/api/excel', (req, res) => {
       const findingCellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex + 1 });
       worksheet[findingCellAddress] = {
         v: finding ? 'x' : '',
-        s: {
-        
-        }
+        s: {}
       };
     });
   });
@@ -103,43 +97,78 @@ app.get('/api/test', (req, res) => {
   res.send('endpoints working');
 })
 
+function stripPrefix(url) {
+  const prefixes = ['www.', 'checkout.', 'store.'];
+
+  for (let prefix of prefixes) {
+    if (url.startsWith(prefix)) {
+      return url.substring(prefix.length);
+    }
+  }
+  return url;
+}
+
+
+
 app.post('/api/check', async (req, res) => {
   const target_url = req.body.target;
+  console.log('API CHECK : ' + target_url)
 
-  const protocol = await checkProtocol(target_url);
+  try {
+    const response = await fetch("http://" + target_url);
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/x-www-form-urlencoded");
+    const urlencoded = new URLSearchParams();
+    
+    let strippedWWW = stripPrefix(target_url)
+    let frameworks = []
 
-  if (protocol === 'unknown') {
-    res.status(404).send('404');
-  } else {
-    try {
-      const response = await fetch(`${protocol}://${target_url}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.text();
-
-      const tempfindings = searchStrings.map(str => {
-        if (str === 1) {
-          return CheckWordpress(data);
-        } else if (str === 4) {
-          return CheckGoogleAnalytics(data);
-        } else {
-          return data.includes(str);
-        }
-      });
-
-      let tempjson = {
-        target: target_url,
-        findings: tempfindings
-      };
-
-      res.send(tempjson);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      res.status(500).send({ error: 'Internal Server Error' });
+    urlencoded.append("data", `{\"rawhostname\":\"${strippedWWW}\",\"hostname\":\"${strippedWWW}\",\"url\":\"https://${target_url}\",\"encode\":true}`);
+    
+    await fetch("https://www.whatruns.com/api/v1/get_site_apps", {
+      method: "POST",
+      headers: myHeaders,
+      body: urlencoded,
+      redirect: "follow"
+    })
+      .then((response) => response.json())
+      .then(result => {
+        let json_result = JSON.parse(result.apps)
+        let dynamic_id = Object.keys(json_result)
+        frameworks = json_result[dynamic_id]['Javascript Frameworks']
+      })
+      .catch((error) => console.error(error));
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
     }
+
+    const data = await response.text();
+    let tempfindings = []
+    
+    searchStrings.map((str, idx) => {
+      if(str === 'react'){
+        let exists = frameworks.some(framework => framework.name === "React");
+        tempfindings[idx] = exists
+      }else if(str === 'angular'){
+        let exists = frameworks.some(framework => framework.name === "Angular JS");
+        tempfindings[idx] = exists
+      }else if(str === 'vue'){
+        let exists = frameworks.some(framework => framework.name === "Vue JS");
+        tempfindings[idx] = exists
+      }else {
+        tempfindings[idx] = data.includes(str);
+      }
+    });
+
+    let tempjson = {
+      target: target_url,
+      findings: tempfindings
+    };
+
+    res.send(tempjson);
+  } catch (error) {
+    res.status(500).send({ error: 'Internal Server Error' });
   }
 });
 
